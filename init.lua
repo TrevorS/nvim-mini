@@ -251,7 +251,26 @@ require('mini.indentscope').setup({
 require('mini.icons').setup()
 
 -- mini.statusline - Minimal statusline
-require('mini.statusline').setup()
+require('mini.statusline').setup({
+  content = {
+    active = function()
+      local mode, mode_hl = MiniStatusline.section_mode({ trunc_width = 120 })
+      local git = MiniStatusline.section_git({ trunc_width = 75 })
+      local diagnostics = MiniStatusline.section_diagnostics({ trunc_width = 75 })
+      local lsp = MiniStatusline.section_lsp({ trunc_width = 75 })
+      local filename = MiniStatusline.section_filename({ trunc_width = 140 })
+
+      return MiniStatusline.combine_groups({
+        { hl = mode_hl, strings = { mode } },
+        { hl = 'MiniStatuslineFilename', strings = { filename } },
+        '%<', -- Truncation point
+        { hl = 'MiniStatuslineDevinfo', strings = { git, lsp, diagnostics } },
+        '%=', -- End left alignment
+      })
+    end,
+  },
+  use_icons = true,
+})
 
 -- mini.pick - Fuzzy finder
 require('mini.pick').setup()
