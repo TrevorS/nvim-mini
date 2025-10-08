@@ -11,7 +11,7 @@ local function ensure_plugin(user, repo)
   if vim.fn.isdirectory(install_path) == 0 then
     vim.notify('Installing ' .. repo .. '...', vim.log.levels.INFO)
     local url = string.format('https://github.com/%s/%s.git', user, repo)
-    vim.fn.system({'git', 'clone', '--depth=1', url, install_path})
+    vim.fn.system({ 'git', 'clone', '--depth=1', url, install_path })
     vim.notify('Installed ' .. repo, vim.log.levels.INFO)
     return true
   end
@@ -48,7 +48,7 @@ vim.api.nvim_create_user_command('PluginUpdate', function()
   for _, plugin in ipairs(plugins) do
     local plugin_path = data_path .. plugin
     vim.notify('Updating ' .. plugin .. '...', vim.log.levels.INFO)
-    vim.fn.system({'git', '-C', plugin_path, 'pull'})
+    vim.fn.system({ 'git', '-C', plugin_path, 'pull' })
   end
 
   vim.cmd('packloadall! | helptags ALL')
@@ -67,45 +67,21 @@ vim.g.maplocalleader = ' '
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_perl_provider = 0
 
--- Visual
-vim.opt.number = true
-vim.opt.signcolumn = 'yes'
-vim.opt.cursorline = true
+-- Settings not covered by mini.basics
 vim.opt.termguicolors = true
-vim.opt.showmode = false
-
--- Editing
 vim.opt.expandtab = true
 vim.opt.tabstop = 2
 vim.opt.shiftwidth = 2
 vim.opt.softtabstop = 2
-vim.opt.smartindent = true
-vim.opt.wrap = false
-
--- Search
-vim.opt.ignorecase = true
-vim.opt.smartcase = true
 vim.opt.inccommand = 'nosplit'
-
--- Undo and backup
-vim.opt.undofile = true
-vim.opt.backup = false
-vim.opt.writebackup = false
-
--- Completion
-vim.opt.completeopt = {'menuone', 'noinsert'}
+vim.opt.completeopt = { 'menuone', 'noinsert' } -- Different from mini.basics 'noselect'
 vim.opt.shortmess:append('c')
-
--- Behavior
-vim.opt.mouse = 'a'
-vim.opt.splitright = true
-vim.opt.splitbelow = true
 vim.opt.updatetime = 250
 vim.opt.timeoutlen = 300
-vim.opt.virtualedit = 'onemore'
-vim.opt.wildmode = {'longest', 'list:longest'}
+vim.opt.virtualedit = 'onemore' -- Different from mini.basics 'block'
+vim.opt.wildmode = { 'longest', 'list:longest' }
 
--- Fillchars
+-- Custom fillchars (overrides mini.basics default)
 vim.opt.fillchars = {
   horiz = '━',
   horizup = '┻',
@@ -116,10 +92,6 @@ vim.opt.fillchars = {
   verthoriz = '╋',
 }
 
--- Spell check
-vim.opt.spelllang = 'en_us'
-vim.opt.spell = true
-
 -- ============================================================================
 -- NEOVIM 0.11 BUILT-IN LSP
 -- ============================================================================
@@ -127,15 +99,15 @@ vim.opt.spell = true
 -- Configure LSP servers (examples - install servers separately)
 -- lua_ls
 vim.lsp.config('lua_ls', {
-  cmd = {'lua-language-server'},
-  filetypes = {'lua'},
-  root_markers = {'.luarc.json', '.luarc.jsonc', '.luacheckrc', '.stylua.toml', 'stylua.toml', 'selene.toml', 'selene.yml', '.git'},
+  cmd = { 'lua-language-server' },
+  filetypes = { 'lua' },
+  root_markers = { '.luarc.json', '.luarc.jsonc', '.luacheckrc', '.stylua.toml', 'stylua.toml', 'selene.toml', 'selene.yml', '.git' },
   settings = {
     Lua = {
-      runtime = {version = 'LuaJIT'},
+      runtime = { version = 'LuaJIT' },
       workspace = {
         checkThirdParty = false,
-        library = {vim.env.VIMRUNTIME}
+        library = { vim.env.VIMRUNTIME }
       }
     }
   }
@@ -143,9 +115,9 @@ vim.lsp.config('lua_ls', {
 
 -- rust-analyzer
 vim.lsp.config('rust_analyzer', {
-  cmd = {'rust-analyzer'},
-  filetypes = {'rust'},
-  root_markers = {'Cargo.toml', 'Cargo.lock', 'rust-project.json'},
+  cmd = { 'rust-analyzer' },
+  filetypes = { 'rust' },
+  root_markers = { 'Cargo.toml', 'Cargo.lock', 'rust-project.json' },
   settings = {
     ['rust-analyzer'] = {
       cargo = {
@@ -158,25 +130,38 @@ vim.lsp.config('rust_analyzer', {
   }
 })
 
--- ts_ls (TypeScript)
-vim.lsp.config('ts_ls', {
-  cmd = {'typescript-language-server', '--stdio'},
-  filetypes = {'javascript', 'javascriptreact', 'typescript', 'typescriptreact'},
-  root_markers = {'package.json', 'tsconfig.json', 'jsconfig.json', '.git'},
+-- vtsls (TypeScript)
+vim.lsp.config('vtsls', {
+  cmd = { 'vtsls', '--stdio' },
+  filetypes = { 'javascript', 'javascriptreact', 'typescript', 'typescriptreact' },
+  root_markers = { 'package.json', 'tsconfig.json', 'jsconfig.json', '.git' },
 })
 
 -- Enable LSP servers
-vim.lsp.enable({'lua_ls', 'rust_analyzer', 'ts_ls'})
+vim.lsp.enable({ 'lua_ls', 'rust_analyzer', 'vtsls' })
 
 -- LSP keymaps (using 0.11 defaults, customize as needed)
 vim.api.nvim_create_autocmd('LspAttach', {
   callback = function(args)
-    local opts = {buffer = args.buf}
+    local opts = { buffer = args.buf }
     vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
     vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
     vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
     vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
     vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
+  end
+})
+
+-- Global format keymap (works in any buffer)
+vim.keymap.set('n', '<leader>f', function() vim.lsp.buf.format() end, { desc = 'Format buffer' })
+
+-- Format on save (optional - comment out if not desired)
+vim.api.nvim_create_autocmd('BufWritePre', {
+  callback = function()
+    local clients = vim.lsp.get_clients({ bufnr = 0 })
+    if #clients > 0 then
+      vim.lsp.buf.format()
+    end
   end
 })
 
@@ -224,8 +209,8 @@ require('mini.completion').setup({
     auto_setup = true,
   },
   window = {
-    info = {height = 25, width = 80, border = 'none'},
-    signature = {height = 25, width = 80, border = 'none'},
+    info = { height = 25, width = 80, border = 'none' },
+    signature = { height = 25, width = 80, border = 'none' },
   },
 })
 
@@ -244,7 +229,7 @@ require('mini.bracketed').setup()
 -- mini.indentscope - Visualize indent scope
 require('mini.indentscope').setup({
   symbol = '│',
-  options = {try_as_border = true}
+  options = { try_as_border = true }
 })
 
 -- mini.icons - Icon provider
@@ -261,7 +246,7 @@ require('mini.statusline').setup({
       local filename = MiniStatusline.section_filename({ trunc_width = 140 })
 
       return MiniStatusline.combine_groups({
-        { hl = mode_hl, strings = { mode } },
+        { hl = mode_hl,                  strings = { mode } },
         { hl = 'MiniStatuslineFilename', strings = { filename } },
         '%<', -- Truncation point
         { hl = 'MiniStatuslineDevinfo', strings = { git, lsp, diagnostics } },
@@ -293,15 +278,15 @@ vim.api.nvim_create_autocmd('User', {
     local buf_id = args.data.buf_id
     -- Remap 'l' and Enter to close explorer when opening file
     vim.keymap.set('n', 'l', function()
-      require('mini.files').go_in({close_on_file = true})
-    end, {buffer = buf_id, desc = 'Open file and close explorer'})
+      require('mini.files').go_in({ close_on_file = true })
+    end, { buffer = buf_id, desc = 'Open file and close explorer' })
     vim.keymap.set('n', '<CR>', function()
-      require('mini.files').go_in({close_on_file = true})
-    end, {buffer = buf_id, desc = 'Open file and close explorer'})
+      require('mini.files').go_in({ close_on_file = true })
+    end, { buffer = buf_id, desc = 'Open file and close explorer' })
     -- Esc to close explorer
     vim.keymap.set('n', '<Esc>', function()
       require('mini.files').close()
-    end, {buffer = buf_id, desc = 'Close explorer'})
+    end, { buffer = buf_id, desc = 'Close explorer' })
   end,
 })
 
@@ -318,6 +303,38 @@ require('mini.trailspace').setup()
 -- mini.tabline - Buffer/tab line (like bufferline.nvim)
 require('mini.tabline').setup()
 
+-- mini.clue - which-key style hints
+require('mini.clue').setup({
+  triggers = {
+    { mode = 'n', keys = '<Leader>' },
+    { mode = 'x', keys = '<Leader>' },
+    { mode = 'n', keys = 'g' },
+    { mode = 'x', keys = 'g' },
+    { mode = 'n', keys = '[' },
+    { mode = 'n', keys = ']' },
+  },
+  clues = {
+    require('mini.clue').gen_clues.builtin_completion(),
+    require('mini.clue').gen_clues.g(),
+    require('mini.clue').gen_clues.marks(),
+    require('mini.clue').gen_clues.registers(),
+    require('mini.clue').gen_clues.windows(),
+    require('mini.clue').gen_clues.z(),
+  },
+  window = {
+    delay = 500, -- Increase delay so quick keypresses work
+  },
+})
+
+-- mini.move - move lines/blocks with Alt+hjkl
+require('mini.move').setup()
+
+-- mini.extra - additional pickers
+require('mini.extra').setup()
+
+-- mini.visits - track frecent files
+require('mini.visits').setup()
+
 -- Auto-hide tabline when only one buffer exists
 local function update_tabline_visibility()
   local buffers = vim.tbl_filter(function(b)
@@ -330,7 +347,7 @@ end
 update_tabline_visibility()
 
 -- Update on buffer changes
-vim.api.nvim_create_autocmd({'BufAdd', 'BufDelete'}, {
+vim.api.nvim_create_autocmd({ 'BufAdd', 'BufDelete' }, {
   callback = function()
     vim.schedule(update_tabline_visibility)
   end,
@@ -358,53 +375,51 @@ vim.cmd.colorscheme('catppuccin')
 -- ============================================================================
 
 -- Splits
-vim.keymap.set('n', '<leader>v', '<cmd>vsplit<cr><c-w>l', {desc = 'Vertical split'})
-vim.keymap.set('n', '<leader>h', '<cmd>split<cr><c-w>j', {desc = 'Horizontal split'})
+vim.keymap.set('n', '<leader>v', '<cmd>vsplit<cr><c-w>l', { desc = 'Vertical split' })
+vim.keymap.set('n', '<leader>h', '<cmd>split<cr><c-w>j', { desc = 'Horizontal split' })
 
 -- Edit config files
-vim.keymap.set('n', '<leader>ev', '<cmd>edit $HOME/.config/nvim/init.lua<cr>', {desc = 'Edit vim config'})
-vim.keymap.set('n', '<leader>ez', '<cmd>edit $HOME/.zshrc<cr>', {desc = 'Edit zshrc'})
-vim.keymap.set('n', '<leader>ew', '<cmd>edit $HOME/.wezterm.lua<cr>', {desc = 'Edit wezterm config'})
+vim.keymap.set('n', '<leader>ev', function()
+  vim.cmd.edit(vim.fn.stdpath('config') .. '/init.lua')
+end, { desc = 'Edit vim config' })
+vim.keymap.set('n', '<leader>ez', '<cmd>edit $HOME/.zshrc<cr>', { desc = 'Edit zshrc' })
+vim.keymap.set('n', '<leader>ew', '<cmd>edit $HOME/.wezterm.lua<cr>', { desc = 'Edit wezterm config' })
 
 -- Redraw and clear highlights
-vim.keymap.set('n', '<leader>l', '<cmd>redraw!<cr><cmd>nohl<cr><esc>', {desc = 'Redraw and clear highlights'})
+vim.keymap.set('n', '<leader>l', '<cmd>redraw!<cr><cmd>nohl<cr><esc>', { desc = 'Redraw and clear highlights' })
 
 -- System clipboard yank in visual mode
-vim.keymap.set('v', '<leader>y', '"+y', {desc = 'Yank to system clipboard'})
+vim.keymap.set('v', '<leader>y', '"+y', { desc = 'Yank to system clipboard' })
 
 -- mini.files (like oil.nvim)
 vim.keymap.set('n', '-', function()
   require('mini.files').open(vim.api.nvim_buf_get_name(0))
-end, {desc = 'Open file explorer'})
+end, { desc = 'Open file explorer' })
 
 -- mini.pick (adapted from telescope bindings)
 vim.keymap.set('n', '<leader>p', function()
   require('mini.pick').builtin.files()
-end, {desc = 'Find files'})
+end, { desc = 'Find files' })
 
 vim.keymap.set('n', '<leader>b', function()
   require('mini.pick').builtin.buffers()
-end, {desc = 'Find buffers'})
+end, { desc = 'Find buffers' })
 
 vim.keymap.set('n', '<leader>gg', function()
   require('mini.pick').builtin.grep_live()
-end, {desc = 'Live grep'})
+end, { desc = 'Live grep' })
 
 vim.keymap.set('n', '<leader>*', function()
-  require('mini.pick').builtin.grep({pattern = vim.fn.expand('<cword>')})
-end, {desc = 'Grep word under cursor'})
-
-vim.keymap.set('n', '<leader>fh', function()
-  require('mini.pick').builtin.help()
-end, {desc = 'Find help'})
+  require('mini.pick').builtin.grep({ pattern = vim.fn.expand('<cword>') })
+end, { desc = 'Grep word under cursor' })
 
 -- Navigate wrapped lines
-vim.keymap.set('n', 'j', 'gj', {desc = 'Move down (wrapped)'})
-vim.keymap.set('n', 'k', 'gk', {desc = 'Move up (wrapped)'})
+vim.keymap.set('n', 'j', 'gj', { desc = 'Move down (wrapped)' })
+vim.keymap.set('n', 'k', 'gk', { desc = 'Move up (wrapped)' })
 
 -- Buffer navigation
-vim.keymap.set('n', '<TAB>', '<cmd>bnext<cr>', {desc = 'Next buffer'})
-vim.keymap.set('n', '<S-TAB>', '<cmd>bprevious<cr>', {desc = 'Previous buffer'})
+vim.keymap.set('n', '<TAB>', '<cmd>bnext<cr>', { desc = 'Next buffer' })
+vim.keymap.set('n', '<S-TAB>', '<cmd>bprevious<cr>', { desc = 'Previous buffer' })
 
 -- Buffer switching by position
 for i = 1, 9 do
@@ -412,28 +427,28 @@ for i = 1, 9 do
     local buffers = vim.tbl_filter(function(b) return vim.fn.buflisted(b) == 1 end, vim.api.nvim_list_bufs())
     table.sort(buffers)
     if buffers[i] then vim.api.nvim_set_current_buf(buffers[i]) end
-  end, {desc = 'Go to buffer ' .. i})
+  end, { desc = 'Go to buffer ' .. i })
 end
 
 -- Format JSON with jq
-vim.keymap.set('n', '<leader>jf', '<cmd>%!jq .<cr>', {desc = 'Format JSON with jq'})
+vim.keymap.set('n', '<leader>jf', '<cmd>%!jq .<cr>', { desc = 'Format JSON with jq' })
 
 -- Format SQL with sleek
-vim.keymap.set('n', '<leader>sf', '<cmd>%!sleek<cr>', {desc = 'Format SQL with sleek'})
+vim.keymap.set('n', '<leader>sf', '<cmd>%!sleek<cr>', { desc = 'Format SQL with sleek' })
 
 -- Copy buffer path to system clipboard
 vim.keymap.set('n', '<leader>xp', function()
   local path = vim.api.nvim_buf_get_name(0)
   vim.fn.setreg('+', path)
   vim.notify('Copied path: ' .. path, vim.log.levels.INFO)
-end, {desc = 'Copy buffer path to clipboard'})
+end, { desc = 'Copy buffer path to clipboard' })
 
 -- Trim trailing whitespace
 vim.keymap.set('n', '<leader>ts', function()
   require('mini.trailspace').trim()
   vim.notify('Trimmed trailing whitespace', vim.log.levels.INFO)
-end, {desc = 'Trim trailing whitespace'})
+end, { desc = 'Trim trailing whitespace' })
 
 -- Better indenting
-vim.keymap.set('v', '<', '<gv', {desc = 'Indent left'})
-vim.keymap.set('v', '>', '>gv', {desc = 'Indent right'})
+vim.keymap.set('v', '<', '<gv', { desc = 'Indent left' })
+vim.keymap.set('v', '>', '>gv', { desc = 'Indent right' })
