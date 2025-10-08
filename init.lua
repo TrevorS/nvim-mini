@@ -93,7 +93,7 @@ vim.opt.backup = false
 vim.opt.writebackup = false
 
 -- Completion
-vim.opt.completeopt = {'menuone', 'noinsert', 'noselect'}
+vim.opt.completeopt = {'menuone', 'noinsert'}
 vim.opt.shortmess:append('c')
 
 -- Behavior
@@ -168,13 +168,6 @@ vim.lsp.config('ts_ls', {
 -- Enable LSP servers
 vim.lsp.enable({'lua_ls', 'rust_analyzer', 'ts_ls'})
 
--- Enable built-in completion for buffers with LSP
-vim.api.nvim_create_autocmd('LspAttach', {
-  callback = function(args)
-    vim.lsp.completion.enable(true, args.data.client_id, args.buf, {autotrigger = true})
-  end
-})
-
 -- LSP keymaps (using 0.11 defaults, customize as needed)
 vim.api.nvim_create_autocmd('LspAttach', {
   callback = function(args)
@@ -191,6 +184,24 @@ vim.api.nvim_create_autocmd('LspAttach', {
 -- MINI.NVIM MODULES
 -- ============================================================================
 
+-- mini.basics - Sensible defaults, window navigation, autocommands
+require('mini.basics').setup({
+  options = {
+    basic = true,
+    extra_ui = false,
+  },
+  mappings = {
+    basic = true,
+    option_toggle_prefix = [[\]],
+    windows = true,
+    move_with_alt = false,
+  },
+  autocommands = {
+    basic = true,
+    relnum_in_visual_mode = false,
+  },
+})
+
 -- mini.comment - Toggle comments with 'gc'
 require('mini.comment').setup()
 
@@ -200,8 +211,32 @@ require('mini.surround').setup()
 -- mini.pairs - Auto-close brackets/quotes
 require('mini.pairs').setup()
 
+-- mini.snippets - Snippet support (required for mini.completion LSP snippets)
+require('mini.snippets').setup()
+
 -- mini.ai - Enhanced text objects
 require('mini.ai').setup()
+
+-- mini.completion - LSP completion with signature help
+require('mini.completion').setup({
+  lsp_completion = {
+    source_func = 'omnifunc',
+    auto_setup = true,
+  },
+  window = {
+    info = {height = 25, width = 80, border = 'none'},
+    signature = {height = 25, width = 80, border = 'none'},
+  },
+})
+
+-- Tab to select/confirm completion
+vim.keymap.set('i', '<Tab>', function()
+  if vim.fn.pumvisible() == 1 then
+    return '<C-y>'
+  else
+    return '<Tab>'
+  end
+end, { expr = true, desc = 'Confirm completion or insert tab' })
 
 -- mini.bracketed - Navigate with [ and ]
 require('mini.bracketed').setup()
@@ -251,6 +286,19 @@ vim.api.nvim_create_autocmd('User', {
   end,
 })
 
+-- mini.git - Git integration for hunks, blame, and diff overlays
+require('mini.git').setup()
+
+-- mini.notify - Show notifications
+require('mini.notify').setup()
+vim.notify = require('mini.notify').make_notify()
+
+-- mini.trailspace - Highlight and remove trailing whitespace
+require('mini.trailspace').setup()
+
+-- mini.tabline - Buffer/tab line (like bufferline.nvim)
+require('mini.tabline').setup()
+
 -- ============================================================================
 -- CATPPUCCIN THEME
 -- ============================================================================
@@ -271,12 +319,6 @@ vim.cmd.colorscheme('catppuccin')
 -- ============================================================================
 -- KEYMAPS
 -- ============================================================================
-
--- Window navigation
-vim.keymap.set('n', '<C-h>', '<C-w>h', {desc = 'Move to left window'})
-vim.keymap.set('n', '<C-j>', '<C-w>j', {desc = 'Move to bottom window'})
-vim.keymap.set('n', '<C-k>', '<C-w>k', {desc = 'Move to top window'})
-vim.keymap.set('n', '<C-l>', '<C-w>l', {desc = 'Move to right window'})
 
 -- Splits
 vim.keymap.set('n', '<leader>v', '<cmd>vsplit<cr><c-w>l', {desc = 'Vertical split'})
@@ -327,10 +369,12 @@ vim.keymap.set('n', 'k', 'gk', {desc = 'Move up (wrapped)'})
 vim.keymap.set('n', '<TAB>', '<cmd>bnext<cr>', {desc = 'Next buffer'})
 vim.keymap.set('n', '<S-TAB>', '<cmd>bprevious<cr>', {desc = 'Previous buffer'})
 
--- Buffer switching by number
+-- Buffer switching by position
 for i = 1, 9 do
   vim.keymap.set('n', '<leader>' .. i, function()
-    vim.cmd('buffer ' .. i)
+    local buffers = vim.tbl_filter(function(b) return vim.fn.buflisted(b) == 1 end, vim.api.nvim_list_bufs())
+    table.sort(buffers)
+    if buffers[i] then vim.api.nvim_set_current_buf(buffers[i]) end
   end, {desc = 'Go to buffer ' .. i})
 end
 
@@ -346,6 +390,12 @@ vim.keymap.set('n', '<leader>xp', function()
   vim.fn.setreg('+', path)
   vim.notify('Copied path: ' .. path, vim.log.levels.INFO)
 end, {desc = 'Copy buffer path to clipboard'})
+
+-- Trim trailing whitespace
+vim.keymap.set('n', '<leader>ts', function()
+  require('mini.trailspace').trim()
+  vim.notify('Trimmed trailing whitespace', vim.log.levels.INFO)
+end, {desc = 'Trim trailing whitespace'})
 
 -- Better indenting
 vim.keymap.set('v', '<', '<gv', {desc = 'Indent left'})
