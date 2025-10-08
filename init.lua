@@ -318,6 +318,24 @@ require('mini.trailspace').setup()
 -- mini.tabline - Buffer/tab line (like bufferline.nvim)
 require('mini.tabline').setup()
 
+-- Auto-hide tabline when only one buffer exists
+local function update_tabline_visibility()
+  local buffers = vim.tbl_filter(function(b)
+    return vim.fn.buflisted(b) == 1
+  end, vim.api.nvim_list_bufs())
+  vim.o.showtabline = #buffers > 1 and 2 or 0
+end
+
+-- Set initial state
+update_tabline_visibility()
+
+-- Update on buffer changes
+vim.api.nvim_create_autocmd({'BufAdd', 'BufDelete'}, {
+  callback = function()
+    vim.schedule(update_tabline_visibility)
+  end,
+})
+
 -- ============================================================================
 -- CATPPUCCIN THEME
 -- ============================================================================
