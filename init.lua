@@ -393,8 +393,20 @@ vim.keymap.set('v', '<leader>y', '"+y', { desc = 'Yank to system clipboard' })
 
 -- mini.files (like oil.nvim)
 vim.keymap.set('n', '-', function()
-  require('mini.files').open(vim.api.nvim_buf_get_name(0))
-end, { desc = 'Open file explorer' })
+  local MiniFiles = require('mini.files')
+  local bufname = vim.api.nvim_buf_get_name(0)
+
+  -- Check if we're already in mini.files by looking at buffer name
+  if bufname:match('^minifiles://') then
+    -- We're in mini.files, go up a directory
+    MiniFiles.go_out()
+  else
+    -- We're in a regular buffer, open mini.files
+    -- If buffer is empty/unnamed, use current working directory
+    local path = bufname ~= '' and bufname or vim.fn.getcwd()
+    MiniFiles.open(path)
+  end
+end, { desc = 'Open file explorer or go up' })
 
 -- mini.pick (adapted from telescope bindings)
 vim.keymap.set('n', '<leader>p', function()
