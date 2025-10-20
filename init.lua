@@ -1,6 +1,11 @@
 -- ABOUTME: Minimal Neovim 0.11.4 config with custom plugin bootstrap
 -- Single-file configuration using mini.nvim modules and catppuccin theme
 
+---@diagnostic disable: inject-field, undefined-field, assign-type-mismatch, param-type-mismatch
+-- Disable unused language providers
+vim.g.loaded_node_provider = 0
+vim.g.loaded_python3_provider = 0
+
 -- ============================================================================
 -- PLUGIN BOOTSTRAP
 -- ============================================================================
@@ -31,6 +36,16 @@ local function bootstrap_plugins()
 		installed_any = true
 	end
 
+	-- Install oil.nvim
+	if ensure_plugin("stevearc", "oil.nvim") then
+		installed_any = true
+	end
+
+	-- Install nvim-treesitter
+	if ensure_plugin("nvim-treesitter", "nvim-treesitter") then
+		installed_any = true
+	end
+
 	if installed_any then
 		vim.notify("Run :PluginUpdate to update plugins", vim.log.levels.INFO)
 		vim.cmd("packloadall! | helptags ALL")
@@ -40,19 +55,35 @@ end
 -- Bootstrap on first run
 bootstrap_plugins()
 
--- Create update command
+-- Create update command (async to avoid UI hang)
 vim.api.nvim_create_user_command("PluginUpdate", function()
 	local data_path = vim.fn.stdpath("data") .. "/site/pack/vendor/start/"
 	local plugins = vim.fn.readdir(data_path)
+	local completed = 0
+	local total = #plugins
+
+	vim.notify("Plugin updates started (running in background)...", vim.log.levels.INFO)
 
 	for _, plugin in ipairs(plugins) do
 		local plugin_path = data_path .. plugin
 		vim.notify("Updating " .. plugin .. "...", vim.log.levels.INFO)
-		vim.fn.system({ "git", "-C", plugin_path, "pull" })
-	end
 
-	vim.cmd("packloadall! | helptags ALL")
-	vim.notify("Plugins updated!", vim.log.levels.INFO)
+		vim.system({ "git", "-C", plugin_path, "pull" }, {}, function(obj)
+			completed = completed + 1
+			if obj.code == 0 then
+				vim.notify("Updated " .. plugin, vim.log.levels.INFO)
+			else
+				vim.notify("Failed to update " .. plugin, vim.log.levels.WARN)
+			end
+
+			if completed == total then
+				vim.schedule(function()
+					vim.cmd("packloadall! | helptags ALL")
+					vim.notify("All plugins updated!", vim.log.levels.INFO)
+				end)
+			end
+		end)
+	end
 end, {})
 
 -- ============================================================================
@@ -352,31 +383,15 @@ require("mini.bracketed").setup()
 require("mini.move").setup()
 require("mini.git").setup()
 
-require("mini.files").setup({
-	windows = {
-		max_number = 3,
-		preview = true,
-		width_focus = 30,
-		width_nofocus = 15,
-		width_preview = 50,
-	},
+require("oil").setup({
+	default_file_explorer = true,
+	delete_to_trash = true,
+	skip_confirm_for_simple_edits = true,
 })
 
--- mini.files autocmd: close on file open
-vim.api.nvim_create_autocmd("User", {
-	pattern = "MiniFilesBufferCreate",
-	callback = function(args)
-		local buf_id = args.data.buf_id
-		vim.keymap.set("n", "l", function()
-			require("mini.files").go_in({ close_on_file = true })
-		end, { buffer = buf_id, desc = "Open file and close explorer" })
-		vim.keymap.set("n", "<CR>", function()
-			require("mini.files").go_in({ close_on_file = true })
-		end, { buffer = buf_id, desc = "Open file and close explorer" })
-		vim.keymap.set("n", "<Esc>", function()
-			require("mini.files").close()
-		end, { buffer = buf_id, desc = "Close explorer" })
-	end,
+require("nvim-treesitter.configs").setup({
+	ensure_installed = { "lua", "rust", "typescript", "javascript", "json", "toml", "markdown" },
+	highlight = { enable = true },
 })
 
 require("mini.clue").setup({
@@ -450,22 +465,8 @@ vim.keymap.set("n", "<leader>l", "<cmd>redraw!<cr><cmd>nohl<cr><esc>", { desc = 
 -- System clipboard yank in visual mode
 vim.keymap.set("v", "<leader>y", '"+y', { desc = "Yank to system clipboard" })
 
--- mini.files (like oil.nvim)
-vim.keymap.set("n", "-", function()
-	local MiniFiles = require("mini.files")
-	local bufname = vim.api.nvim_buf_get_name(0)
-
-	-- Check if we're already in mini.files by looking at buffer name
-	if bufname:match("^minifiles://") then
-		-- We're in mini.files, go up a directory
-		MiniFiles.go_out()
-	else
-		-- We're in a regular buffer, open mini.files
-		-- If buffer is empty/unnamed, use current working directory
-		local path = bufname ~= "" and bufname or vim.fn.getcwd()
-		MiniFiles.open(path)
-	end
-end, { desc = "Open file explorer or go up" })
+-- File explorer
+vim.keymap.set("n", "-", "<cmd>Oil<cr>", { desc = "Open parent directory" })
 
 -- mini.pick keymaps
 local pick_maps = {

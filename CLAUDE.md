@@ -4,132 +4,203 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-This is a **single-file Neovim 0.11.4 configuration** (`init.lua`) that uses:
-- **Custom plugin bootstrap**: Simple `ensure_plugin()` function that clones plugins to `~/.local/share/nvim/site/pack/vendor/start/`
-- **Mini.nvim modules**: 18 modules including basics, completion, snippets, git, notify, trailspace, tabline
-- **Neovim 0.11 built-in LSP**: Uses `vim.lsp.config()` and `vim.lsp.enable()` (NO lspconfig plugin needed)
-- **mini.completion**: Replaces built-in completion with Tab-to-confirm workflow
-- **Catppuccin theme**: Mocha flavor
+This is a **single-file Neovim 0.11.4 configuration** (`init.lua`) with zero external dependencies except plugins. The config follows a minimal, pragmatic philosophy:
 
-## Key Design Principles
+- **No plugin manager** - Custom `ensure_plugin()` function clones plugins directly to `~/.local/share/nvim/site/pack/vendor/start/`
+- **Everything in init.lua** - No split config files, no `lua/` directory, no complexity
+- **Neovim 0.11 built-in LSP** - Uses `vim.lsp.config()` and `vim.lsp.enable()` directly (no nvim-lspconfig)
+- **Mini.nvim for core features** - 14 modules handling text editing, completion, UI, navigation, and git
+- **Explicit parser management** - nvim-treesitter with `ensure_installed` for only necessary languages
 
-1. **No plugin manager** - Plugins are git cloned directly using native Neovim package loading
-2. **Everything in init.lua** - No split config files, no `lua/` directory
-3. **LSP servers configured inline** - Uses Neovim 0.11's built-in LSP configuration (lua_ls, rust_analyzer, ts_ls)
-4. **Mini.nvim for everything** - Fuzzy finding, file explorer, statusline, completion, git, notifications
+### Plugin Stack
 
-## Active Mini.nvim Modules
+1. **mini.nvim** (18+ modules) - Core editing and workflow tools
+   - Text editing: basics, comment, surround, pairs, ai, snippets
+   - UI: icons, indentscope, statusline, notify, trailspace, tabline
+   - Navigation: pick (fuzzy finder), git, bracketed, move, extra, visits
+   - Completion: mini.completion with Tab-to-confirm workflow
 
-**Text Editing**: basics, comment, surround, pairs, snippets, ai
-**Workflow**: bracketed, pick, files, git
-**Completion**: completion (with Tab-to-confirm)
-**Appearance**: indentscope, icons, statusline, notify, trailspace, tabline
+2. **oil.nvim** - File explorer (replaces mini.files)
+   - Edit directories like buffers
+   - Press `-` to open parent, `-` again to navigate up
 
-## Plugin Management
+3. **nvim-treesitter** - Syntax highlighting with explicit parsers
+   - Installed: lua, rust, typescript, javascript, json, toml, markdown
+   - No auto-install to keep it predictable
 
-### Install/Update plugins
-```vim
-:PluginUpdate
-```
+4. **catppuccin** (mocha) - Theme with mini.nvim integration
 
-This command:
-- Git pulls all plugins in `~/.local/share/nvim/site/pack/vendor/start/`
-- Runs `packloadall!` and `helptags ALL`
+### LSP Configuration
 
-### Add a new plugin
-Edit `init.lua` and add to `bootstrap_plugins()`:
-```lua
-if ensure_plugin('username', 'plugin-name') then
-  installed_any = true
-end
-```
-
-### Plugin locations
-- Install path: `~/.local/share/nvim/site/pack/vendor/start/`
-- Currently installed: `mini.nvim`, `catppuccin/nvim`
-
-## LSP Configuration
-
-LSP servers are configured using **Neovim 0.11's built-in LSP** (not nvim-lspconfig):
+LSP servers are configured inline using Neovim 0.11's built-in APIs:
 
 ```lua
 vim.lsp.config('server_name', {
-  cmd = {'command'},
+  cmd = {'executable_name'},
   filetypes = {'filetype'},
-  root_markers = {'.git'},
-  settings = {}
+  root_markers = {'root_marker'},
+  settings = {}  -- Language-specific settings
 })
 vim.lsp.enable({'server_name'})
 ```
 
-### Currently configured LSP servers
+**Currently configured servers:**
 - `lua_ls` - Lua (requires `lua-language-server` binary)
-- `rust_analyzer` - Rust (requires `rust-analyzer` binary)
-- `ts_ls` - TypeScript/JavaScript (requires `typescript-language-server` binary)
+- `rust_analyzer` - Rust (requires `rust-analyzer` binary, uses clippy for check)
+- `vtsls` - TypeScript/JavaScript (requires `typescript-language-server` binary)
 
-**Note**: LSP binaries must be installed separately (e.g., via Mason, homebrew, cargo, npm)
+**Note:** LSP binaries must be installed separately (e.g., via Homebrew, cargo, npm).
 
-## Completion Workflow
+### Diagnostic Float Management
 
-Uses **mini.completion** with custom keybindings:
-- **Ctrl-n** / **Ctrl-p** - Navigate completion menu (down/up)
-- **Tab** - Confirm/select completion
-- Auto-triggers as you type in LSP-enabled buffers
-- First item is pre-selected by default (`completeopt` without 'noselect')
+Custom state machine for diagnostic floats (lines 185-253):
+- Auto-shows on `CursorHold` after 250ms (configurable via `updatetime`)
+- `<leader>d` toggles the float - dismissing once per line prevents spam
+- Automatically clears dismissed state on line change or text modification
+- Respects multi-line diagnostics
 
-## Key Bindings
+### Format-on-Save Behavior
 
-Leader key: `<Space>`
+- Trims trailing whitespace via mini.trailspace
+- Ensures EOF newline
+- Lua files: Uses `stylua` if available (via shell), otherwise LSP format
+- Other files: Uses LSP format if clients are available
 
-### Essential mappings
-- `-` - Open file explorer (mini.files) at current buffer location
+## Common Development Tasks
+
+### Validation Commands
+
+**Lint and format check**
+```bash
+make
+```
+Runs both linting (luacheck) and formatting (stylua). Output is minimal and clean.
+
+**Individual commands**
+```bash
+make lint      # Run luacheck
+make format    # Run stylua
+```
+
+**Inside Neovim**
+```vim
+:checkhealth   # Verify providers, LSP, treesitter
+:messages      # Check for errors
+:LspInfo       # Verify LSP client attachment
+```
+
+### Plugin Management
+
+**Install/update plugins**
+```vim
+:PluginUpdate
+```
+Runs `git pull` on all plugins asynchronously in `~/.local/share/nvim/site/pack/vendor/start/`. Runs non-blocking to keep UI responsive.
+
+**Add a new plugin**
+1. Edit `init.lua` bootstrap section (around line 43)
+2. Add: `if ensure_plugin("github_user", "repo_name") then installed_any = true end`
+3. Add setup code for the plugin (e.g., `require('plugin_name').setup({...})`)
+4. Run `:PluginUpdate` to install
+
+### Language Support
+
+To add support for a new language:
+1. Install the LSP server binary (e.g., `brew install lua-language-server`)
+2. Add `vim.lsp.config()` block with server settings
+3. Add to `vim.lsp.enable()` array
+4. Add parser to treesitter `ensure_installed` array if syntax highlighting needed
+5. Add to format-on-save logic if custom formatter available
+6. Update `.luarc.json` and `.luacheckrc` as needed for new globals
+
+## Key Bindings Reference
+
+**Leader key:** `<Space>`
+
+### Essential
+- `-` - Open file explorer (oil.nvim)
 - `<leader>p` - Find files (mini.pick)
 - `<leader>b` - Find buffers (mini.pick)
 - `<leader>gg` - Live grep (mini.pick)
 - `<leader>*` - Grep word under cursor (mini.pick)
-- `<leader>1-9` - Jump to buffer by position in tabline
-- `<leader>ts` - Trim trailing whitespace
-- `<leader>ev` - Edit vim config (`~/.config/nvim/init.lua`)
 
-### Window navigation (from mini.basics)
+### Navigation
 - `Ctrl-h/j/k/l` - Move between windows
+- `<TAB>` / `<S-TAB>` - Next/previous buffer
+- `<leader>1-9` - Jump to buffer by position in tabline
+- `j/k` - Move down/up respecting line wrapping (gj/gk)
 
-### LSP mappings (when attached)
+### LSP (when attached)
 - `gd` - Go to definition
 - `gr` - Show references
 - `K` - Hover documentation
 - `<leader>rn` - Rename symbol
 - `<leader>ca` - Code action
+- `<leader>f` - Format buffer (global, not LSP-dependent)
 
-## Testing/Validation
+### Editing
+- `<leader>h` / `<leader>v` - Horizontal/vertical split
+- `<leader>q` - Close buffer (quit if last)
+- `<leader>d` - Toggle diagnostic float
+- `<leader>xx` - Show all diagnostics (mini.extra picker)
+- `<leader>ts` - Trim trailing whitespace
+- `<leader>l` - Redraw and clear highlights
 
-No automated tests or linting for this config. To verify:
-1. Open Neovim: `nvim`
-2. Check for errors: `:messages`
-3. Verify plugins loaded: `:scriptnames`
-4. Test LSP: Open a Lua/Rust/TS file and check `:LspInfo`
+### Formatting
+- `<leader>jf` - Format JSON with jq
+- `<leader>sf` - Format SQL with sleek
 
-## Common Modifications
+### Config Editing
+- `<leader>ev` - Edit vim config (init.lua)
+- `<leader>ez` - Edit zshrc
+- `<leader>eg` - Edit ghostty config
 
-### Add mini.nvim module
-Insert setup call in the MINI.NVIM MODULES section (~line 190-300):
-```lua
-require('mini.MODULE_NAME').setup()
-```
+### Utility
+- `<leader>y` - Yank selection to system clipboard (visual mode)
+- `<leader>xp` - Copy buffer path to clipboard
 
-### Change theme flavor
-Find `catppuccin.setup()` in CATPPUCCIN THEME section:
-```lua
-flavour = 'mocha',  -- or 'latte', 'frappe', 'macchiato'
-```
+## Settings Overview
 
-### Adjust LSP settings
-Modify the `settings` table in `vim.lsp.config()` calls in NEOVIM 0.11 BUILT-IN LSP section
+**Key non-defaults:**
+- 2-space indentation (tabs, shiftwidth, softtabstop)
+- `completeopt = {"menuone", "noinsert"}` - First completion item pre-selected
+- `updatetime = 250ms` - Controls diagnostic float auto-show delay
+- `timeoutlen = 300ms` - Leader key timeout
+- Unicode box-drawing fillchars for window separators
+- `inccommand = "nosplit"` - Live preview for `:s` commands
+- `virtualedit = "onemore"` - Allow cursor past end of line
 
 ## Important Implementation Notes
 
-- **mini.basics** provides window navigation (Ctrl-hjkl) and highlight-on-yank - don't duplicate these
-- **mini.completion** uses Tab-to-confirm, NOT Tab-to-navigate - this is intentional
+- **mini.basics** provides window navigation (Ctrl-hjkl), so don't duplicate these
+- **mini.completion** uses Tab-to-confirm (not Tab-to-navigate) by design
 - Buffer switching (`<leader>1-9`) matches tabline order (sorted by buffer number)
-- LSP uses Neovim 0.11 built-in APIs - do NOT add nvim-lspconfig
-- No separate config files - everything stays in `init.lua`
+- Tabline auto-hides when only one buffer exists
+- Diagnostic float state persists across line changes but resets on text modification
+- Format-on-save hooks into `BufWritePre` - stylua for Lua, LSP format for others
+- LSP servers use Neovim 0.11 built-in APIs - do NOT add nvim-lspconfig
+
+## Project Configuration Files
+
+**Lua linting & LSP**
+- `.luarc.json` - lua_ls language server configuration (disables some false-positives for Neovim API)
+- `.luacheckrc` - luacheck linter configuration (defines globals)
+
+**Build & Validation**
+- `Makefile` - Minimal targets for `make lint` and `make format`
+
+**Language-specific root markers**
+- **Lua**: `.luarc.json`, `.stylua.toml`, `.luacheckrc`, `stylua.toml`
+- **Rust**: `Cargo.toml`, `Cargo.lock`, `rust-project.json`
+- **TypeScript/JavaScript**: `package.json`, `tsconfig.json`, `jsconfig.json`
+- **Git**: `.git` directory serves as root marker for all languages
+
+## Disabled Language Providers
+
+To minimize startup overhead, the following providers are disabled:
+- Node.js provider (`vim.g.loaded_node_provider = 0`)
+- Python 3 provider (`vim.g.loaded_python3_provider = 0`)
+- Ruby provider (`vim.g.loaded_ruby_provider = 0`)
+- Perl provider (`vim.g.loaded_perl_provider = 0`)
+
+These are not needed for the current setup and would only generate checkhealth warnings.
