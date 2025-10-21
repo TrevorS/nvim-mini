@@ -111,6 +111,8 @@ vim.opt.updatetime = 250
 vim.opt.timeoutlen = 300
 vim.opt.virtualedit = "onemore" -- Different from mini.basics 'block'
 vim.opt.wildmode = { "longest", "list:longest" }
+vim.opt.smoothscroll = true -- Smooth scrolling for long wrapped lines
+vim.opt.jumpoptions = "stack" -- Better jumplist behavior
 
 -- Custom fillchars (overrides mini.basics default)
 vim.opt.fillchars = {
@@ -392,6 +394,15 @@ require("oil").setup({
 require("nvim-treesitter.configs").setup({
 	ensure_installed = { "lua", "rust", "typescript", "javascript", "json", "toml", "markdown" },
 	highlight = { enable = true },
+	incremental_selection = {
+		enable = true,
+		keymaps = {
+			init_selection = "<CR>",
+			node_incremental = "<CR>",
+			scope_incremental = "<TAB>",
+			node_decremental = "<S-CR>",
+		},
+	},
 })
 
 require("mini.clue").setup({
