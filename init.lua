@@ -180,6 +180,21 @@ vim.lsp.config("vtsls", {
 -- Enable LSP servers
 vim.lsp.enable({ "lua_ls", "rust_analyzer", "vtsls" })
 
+-- Diagnostic configuration
+vim.diagnostic.config({
+	virtual_text = { spacing = 4, prefix = "●" },
+	signs = true,
+	underline = true,
+	update_in_insert = false,
+	severity_sort = true,
+	float = {
+		border = "rounded",
+		source = "if_many",
+		header = "",
+		prefix = "",
+	},
+})
+
 -- LSP keymaps
 vim.api.nvim_create_autocmd("LspAttach", {
 	callback = function(args)
@@ -207,10 +222,10 @@ local diagnostic_float_state = {
 
 -- Helper: Find the diagnostic float window
 local function find_diagnostic_float()
-	local current_win = vim.api.nvim_get_current_win()
 	for _, win in ipairs(vim.api.nvim_list_wins()) do
-		local config = vim.api.nvim_win_get_config(win)
-		if config.relative ~= "" and win ~= current_win then
+		local buf = vim.api.nvim_win_get_buf(win)
+		local ft = vim.bo[buf].filetype
+		if ft == "vim.diagnostic" then
 			return win
 		end
 	end
@@ -287,21 +302,34 @@ end
 
 -- Format on save: trim whitespace, ensure EOF newline, then format
 vim.api.nvim_create_autocmd("BufWritePre", {
-	callback = function()
+	callback = function(args)
 		require("mini.trailspace").trim()
 		vim.bo.fixeol = true
 		vim.bo.eol = true
 
 		-- Format Lua files with stylua if available
 		if vim.bo.filetype == "lua" and vim.fn.executable("stylua") == 1 then
-			local view = vim.fn.winsaveview()
-			vim.cmd("%!stylua -")
-			vim.fn.winrestview(view)
+			local lines = vim.api.nvim_buf_get_lines(args.buf, 0, -1, false)
+			local input = table.concat(lines, "\n")
+
+			-- Run stylua synchronously to avoid write race
+			local result = vim.system({ "stylua", "-" }, { stdin = input, text = true }):wait()
+
+			if result.code == 0 then
+				local view = vim.fn.winsaveview()
+				local output_lines = vim.split(result.stdout, "\n")
+				-- Remove trailing empty line if stylua added one
+				if output_lines[#output_lines] == "" then
+					table.remove(output_lines)
+				end
+				vim.api.nvim_buf_set_lines(args.buf, 0, -1, false, output_lines)
+				vim.fn.winrestview(view)
+			end
 		else
 			-- Use LSP format for other filetypes
-			local clients = vim.lsp.get_clients({ bufnr = 0 })
+			local clients = vim.lsp.get_clients({ bufnr = args.buf })
 			if #clients > 0 then
-				vim.lsp.buf.format()
+				vim.lsp.buf.format({ bufnr = args.buf })
 			end
 		end
 	end,
