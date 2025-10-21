@@ -180,20 +180,79 @@ vim.lsp.config("vtsls", {
 -- Enable LSP servers
 vim.lsp.enable({ "lua_ls", "rust_analyzer", "vtsls" })
 
--- LSP keymaps
-vim.api.nvim_create_autocmd("LspAttach", {
+-- LSP handlers with rounded borders
+vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(vim.lsp.handlers.hover, { border = "rounded" })
+vim.lsp.handlers["textDocument/signatureHelp"] =
+	vim.lsp.with(vim.lsp.handlers.signature_help, { border = "rounded" })
+
+-- LSP progress notifications
+vim.api.nvim_create_autocmd("LspProgress", {
 	callback = function(args)
-		local opts = { buffer = args.buf }
-		vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
-		vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
-		vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
-		vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
-		vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+		local client = vim.lsp.get_client_by_id(args.data.client_id)
+		local value = args.data.params.value
+		if client and value.kind == "end" then
+			vim.notify(client.name .. ": " .. (value.message or "Complete"), vim.log.levels.INFO)
+		end
 	end,
 })
 
--- Global format keymap
+-- LSP keymaps and features
+vim.api.nvim_create_autocmd("LspAttach", {
+	callback = function(args)
+		local client = vim.lsp.get_client_by_id(args.data.client_id)
+		local opts = { buffer = args.buf }
+
+		-- Navigation
+		vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+		vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts)
+		vim.keymap.set("n", "gi", vim.lsp.buf.implementation, opts)
+		vim.keymap.set("n", "gy", vim.lsp.buf.type_definition, opts)
+		vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
+
+		-- Documentation
+		vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+		vim.keymap.set("n", "<C-k>", vim.lsp.buf.signature_help, opts)
+
+		-- Code actions
+		vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+		vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+
+		-- Workspace folders
+		vim.keymap.set("n", "<leader>wa", vim.lsp.buf.add_workspace_folder, opts)
+		vim.keymap.set("n", "<leader>wr", vim.lsp.buf.remove_workspace_folder, opts)
+		vim.keymap.set("n", "<leader>wl", function()
+			vim.notify(vim.inspect(vim.lsp.buf.list_workspace_folders()), vim.log.levels.INFO)
+		end, opts)
+
+		-- Inlay hints
+		if client and client.supports_method("textDocument/inlayHint") then
+			vim.lsp.inlay_hint.enable(true, { bufnr = args.buf })
+		end
+
+		-- Code lens
+		if client and client.supports_method("textDocument/codeLens") then
+			vim.lsp.codelens.refresh({ bufnr = args.buf })
+			vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave", "BufWritePost" }, {
+				buffer = args.buf,
+				callback = function()
+					vim.lsp.codelens.refresh({ bufnr = args.buf })
+				end,
+			})
+			vim.keymap.set("n", "<leader>cl", vim.lsp.codelens.run, opts)
+		end
+	end,
+})
+
+-- Global format keymaps
 vim.keymap.set("n", "<leader>f", vim.lsp.buf.format, { desc = "Format buffer" })
+vim.keymap.set("v", "<leader>f", vim.lsp.buf.format, { desc = "Format selection" })
+
+-- Toggle inlay hints
+vim.keymap.set("n", "<leader>th", function()
+	local enabled = vim.lsp.inlay_hint.is_enabled({ bufnr = 0 })
+	vim.lsp.inlay_hint.enable(not enabled, { bufnr = 0 })
+	vim.notify("Inlay hints " .. (enabled and "disabled" or "enabled"), vim.log.levels.INFO)
+end, { desc = "Toggle inlay hints" })
 
 -- ============================================================================
 -- DIAGNOSTIC FLOAT MANAGEMENT
