@@ -16,7 +16,14 @@ local function ensure_plugin(user, repo)
 	if vim.fn.isdirectory(install_path) == 0 then
 		vim.notify("Installing " .. repo .. "...", vim.log.levels.INFO)
 		local url = string.format("https://github.com/%s/%s.git", user, repo)
-		vim.fn.system({ "git", "clone", "--depth=1", url, install_path })
+
+		local result = vim.system({ "git", "clone", "--depth=1", url, install_path }):wait()
+
+		if result.code ~= 0 then
+			vim.notify("Failed to install " .. repo .. ": " .. (result.stderr or "Unknown error"), vim.log.levels.ERROR)
+			return false
+		end
+
 		vim.notify("Installed " .. repo, vim.log.levels.INFO)
 		return true
 	end
@@ -52,8 +59,11 @@ local function bootstrap_plugins()
 	end
 end
 
--- Bootstrap on first run
-bootstrap_plugins()
+-- Bootstrap on first run (only if pack path doesn't exist)
+local pack_path = vim.fn.stdpath("data") .. "/site/pack/vendor/start"
+if vim.fn.isdirectory(pack_path) == 0 then
+	bootstrap_plugins()
+end
 
 -- Create update command (async to avoid UI hang)
 vim.api.nvim_create_user_command("PluginUpdate", function()
@@ -346,11 +356,15 @@ end, { expr = true, desc = "Confirm completion or insert tab" })
 -- ----------------------------------------------------------------------------
 
 require("mini.icons").setup()
-require("mini.indentscope").setup({ symbol = "│", options = { try_as_border = true } })
-require("mini.trailspace").setup()
 require("mini.tabline").setup()
 require("mini.notify").setup()
 vim.notify = require("mini.notify").make_notify()
+
+-- Defer non-critical UI plugins for faster startup
+vim.defer_fn(function()
+	require("mini.indentscope").setup({ symbol = "│", options = { try_as_border = true } })
+	require("mini.trailspace").setup()
+end, 0)
 
 require("mini.statusline").setup({
 	content = {
